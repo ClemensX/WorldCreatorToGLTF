@@ -1,7 +1,12 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-#include <tiny_gltf.h>
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "tiny_gltf.h"
 #include <iostream>
 #include <vector>
 
@@ -59,10 +64,10 @@ void ExportToGLTF(const std::string& outputFilePath, const std::vector<std::stri
                 material.normalTexture.index = texture.source;
             }
             else if (filePath.find("Roughness") != std::string::npos) {
-                material.pbrMetallicRoughness.roughnessTexture.index = texture.source;
+                //material.pbrMetallicRoughness.roughnessTexture.index = texture.source;
             }
             else if (filePath.find("Metalness") != std::string::npos) {
-                material.pbrMetallicRoughness.metallicTexture.index = texture.source;
+                //material.pbrMetallicRoughness.metallicTexture.index = texture.source;
             }
             else if (filePath.find("AmbientOcclusion") != std::string::npos) {
                 material.occlusionTexture.index = texture.source;
@@ -76,16 +81,33 @@ void ExportToGLTF(const std::string& outputFilePath, const std::vector<std::stri
     gltf.WriteGltfSceneToFile(&model, outputFilePath, true, true, true, true);
 }
 
+// Custom log stream that outputs to the console
+class CustomLogStream : public Assimp::LogStream {
+public:
+    void write(const char* message) override {
+        std::cout << message << std::endl;
+    }
+};
+
 int main() {
+    // Create a logger instance
+    Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
+
+    // Attach the custom log stream
+    Assimp::DefaultLogger::get()->attachStream(new CustomLogStream, Assimp::Logger::Info | Assimp::Logger::Warn | Assimp::Logger::Err);
+
     std::vector<std::string> mapFiles = {
-        "path/to/ColorMap.png",
-        "path/to/NormalMap.png",
-        "path/to/RoughnessMap.png",
-        "path/to/MetalnessMap.png",
-        "path/to/AmbientOcclusionMap.png"
+        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
     ExportToGLTF("output.gltf", mapFiles);
+
+    // Destroy the logger instance
+    Assimp::DefaultLogger::kill();
 
     return 0;
 }
