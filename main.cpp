@@ -1,110 +1,119 @@
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
+#include <assimp/commonMetaData.h>
 #include <assimp/postprocess.h>
-#include <assimp/Logger.hpp>
+#include <assimp/scene.h>
+#include <assimp/Exporter.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/LogStream.hpp>
 #include <assimp/DefaultLogger.hpp>
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "tiny_gltf.h"
+
+#include <rapidjson/schema.h>
+
+#include <assimp/material.h>
+#include <assimp/GltfMaterial.h>
+
+#include <assimp/mesh.h>
+#include <assimp/Logger.hpp>
 #include <iostream>
 #include <vector>
+#include <array>
 
-// Function to load a texture map using Assimp
-aiTexture* LoadTexture(const std::string& filePath) {
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filePath, aiProcess_Triangulate | aiProcess_FlipUVs);
-    if (!scene || !scene->HasTextures()) {
-        std::cerr << "Failed to load texture: " << filePath << std::endl;
-        return nullptr;
-    }
-    return scene->mTextures[0];
-}
-
-// Function to create a glTF texture
-tinygltf::Texture CreateGLTFTexture(tinygltf::Model& model, const aiTexture* aiTex) {
-    tinygltf::Texture texture;
-    tinygltf::Image image;
-    tinygltf::Sampler sampler;
-
-    // Fill image data
-    image.width = aiTex->mWidth;
-    image.height = aiTex->mHeight;
-    image.component = 4; // Assuming RGBA
-    image.image.resize(aiTex->mWidth * aiTex->mHeight * 4);
-    memcpy(image.image.data(), aiTex->pcData, image.image.size());
-
-    // Add image to model
-    model.images.push_back(image);
-    texture.source = static_cast<int>(model.images.size() - 1);
-
-    // Add sampler to model
-    model.samplers.push_back(sampler);
-    texture.sampler = static_cast<int>(model.samplers.size() - 1);
-
-    // Add texture to model
-    model.textures.push_back(texture);
-    return texture;
-}
-
-// Function to export maps to glTF 2.0
-void ExportToGLTF(const std::string& outputFilePath, const std::vector<std::string>& mapFiles) {
-    tinygltf::Model model;
-    tinygltf::Material material;
-
-    for (const auto& filePath : mapFiles) {
-        aiTexture* aiTex = LoadTexture(filePath);
-        if (aiTex) {
-            tinygltf::Texture texture = CreateGLTFTexture(model, aiTex);
-            // Assign textures to material based on file type
-            if (filePath.find("Color") != std::string::npos) {
-                material.pbrMetallicRoughness.baseColorTexture.index = texture.source;
-            }
-            else if (filePath.find("Normal") != std::string::npos) {
-                material.normalTexture.index = texture.source;
-            }
-            else if (filePath.find("Roughness") != std::string::npos) {
-                //material.pbrMetallicRoughness.roughnessTexture.index = texture.source;
-            }
-            else if (filePath.find("Metalness") != std::string::npos) {
-                //material.pbrMetallicRoughness.metallicTexture.index = texture.source;
-            }
-            else if (filePath.find("AmbientOcclusion") != std::string::npos) {
-                material.occlusionTexture.index = texture.source;
-            }
-        }
-    }
-
-    model.materials.push_back(material);
-
-    tinygltf::TinyGLTF gltf;
-    gltf.WriteGltfSceneToFile(&model, outputFilePath, true, true, true, true);
-}
-
-// Custom log stream that outputs to the console
-class CustomLogStream : public Assimp::LogStream {
+// Example stream
+class myStream : public Assimp::LogStream {
 public:
-    void write(const char* message) override {
-        std::cout << message << std::endl;
+    // Write something using your own functionality
+    void write(const char* message) {
+        ::printf("%s\n", message);
     }
 };
+
+bool validateMeshPrimitives(const aiScene* scene) {
+    for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
+        const aiMesh* mesh = scene->mMeshes[i];
+        if (mesh->mPrimitiveTypes != aiPrimitiveType_TRIANGLE) {
+            std::cout << "Mesh contains non-triangle primitives." << std::endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool validate(const aiScene* scene) {
+    if (!scene->HasMeshes() || !scene->HasMaterials()) {
+        std::cout << "Scene is missing essential components." << std::endl;
+        return false;
+    }
+    return validateMeshPrimitives(scene);
+}
 
 int main() {
     // Create a logger instance
     Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
 
-    // Attach the custom log stream
-    Assimp::DefaultLogger::get()->attachStream(new CustomLogStream, Assimp::Logger::Info | Assimp::Logger::Warn | Assimp::Logger::Err);
+    // Select the kinds of messages you want to receive on this log stream
+    const unsigned int severity = Assimp::Logger::Debugging | Assimp::Logger::Info | Assimp::Logger::Err | Assimp::Logger::Warn;
 
-    std::vector<std::string> mapFiles = {
-        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
-    };
+    // Attaching it to the default logger
+    Assimp::DefaultLogger::get()->attachStream(new myStream, severity);    // Create a logger instance
 
-    ExportToGLTF("output.gltf", mapFiles);
+    // Test log message
+    Assimp::DefaultLogger::get()->info("Test log message");
+
+    // Create a new scene
+    aiScene* scene = new aiScene();
+    scene->mRootNode = new aiNode();
+    scene->mMaterials = new aiMaterial * [1];
+    scene->mNumMaterials = 1;
+    scene->mMeshes = new aiMesh * [1];
+    scene->mNumMeshes = 1;
+    scene->mRootNode->mMeshes = new unsigned int[1];
+    scene->mRootNode->mNumMeshes = 1;
+
+    // Create a mesh
+    aiMesh* mesh = new aiMesh();
+    mesh->mMaterialIndex = 0;
+    mesh->mNumVertices = 3;
+    mesh->mVertices = new aiVector3D[3];
+    mesh->mVertices[0] = aiVector3D(0.0f, 0.0f, 0.0f);
+    mesh->mVertices[1] = aiVector3D(1.0f, 0.0f, 0.0f);
+    mesh->mVertices[2] = aiVector3D(0.0f, 1.0f, 0.0f);
+    mesh->mNumFaces = 1;
+    mesh->mFaces = new aiFace[1];
+    mesh->mFaces[0].mNumIndices = 3;
+    mesh->mFaces[0].mIndices = new unsigned int[3];
+    mesh->mFaces[0].mIndices[0] = 0;
+    mesh->mFaces[0].mIndices[1] = 1;
+    mesh->mFaces[0].mIndices[2] = 2;
+    mesh->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
+    scene->mMeshes[0] = mesh;
+    scene->mRootNode->mMeshes[0] = 0;
+
+    // Create a material using the metallic-roughness model
+    aiMaterial* material = new aiMaterial();
+    aiColor4D baseColor(1.0f, 0.0f, 0.0f, 1.0f); // Red color
+    material->AddProperty(&baseColor, 1, AI_MATKEY_COLOR_DIFFUSE);
+    float metallic = 1.0f;
+    material->AddProperty(&metallic, 1, AI_MATKEY_METALLIC_FACTOR);
+    float roughness = 0.5f;
+    material->AddProperty(&roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
+    scene->mMaterials[0] = material;
+
+    if (!validate(scene)) {
+        std::cout << "Error validating scene" << std::endl;
+        return -1;
+    }
+    // Export the scene to a glTF file
+    Assimp::Exporter exporter;
+    aiReturn result = exporter.Export(scene, "glb2", "output.glb");
+
+    if (result != aiReturn_SUCCESS) {
+        std::cout << "Error exporting file: " << exporter.GetErrorString() << std::endl;
+        return -1;
+    }
+
+    std::cout << "Exported successfully to output.gltf" << std::endl;
+
+    // Clean up
+    delete scene;
 
     // Destroy the logger instance
     Assimp::DefaultLogger::kill();
