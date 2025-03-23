@@ -5,24 +5,56 @@
 #include <assimp/Importer.hpp>
 #include <assimp/LogStream.hpp>
 #include <assimp/DefaultLogger.hpp>
-
-#include <rapidjson/schema.h>
-
+//#include <rapidjson/schema.h>
 #include <assimp/material.h>
 #include <assimp/GltfMaterial.h>
-
 #include <assimp/mesh.h>
 #include <assimp/Logger.hpp>
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "tiny_gltf.h"
 #include <iostream>
 #include <vector>
 #include <array>
+
+#if defined(DEBUG) | defined(_DEBUG)
+#define LogCond(y,x) if(y){Log(x)}
+#if defined(_WIN64)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#include <windows.h>
+#define Log(x)\
+{\
+    std::stringstream s1768;  s1768 << x; \
+    std::string str = s1768.str(); \
+    std::wstring wstr(str.begin(), str.end()); \
+    std::wstringstream wss(wstr); \
+    OutputDebugString(wss.str().c_str()); \
+}
+#elif defined(__APPLE__)
+#define Log(x)\
+{\
+    std::stringstream s1765; s1765 << x; \
+	printf("%s", s1765.str().c_str()); \
+}
+#else
+#define Log(x)\
+{\
+    std::stringstream s1765; s1765 << x; \
+}
+#endif
+#else
+#define Log(x)
+#define LogCond(y,x)
+#endif
 
 // Example stream
 class myStream : public Assimp::LogStream {
 public:
     // Write something using your own functionality
     void write(const char* message) {
-        ::printf("%s\n", message);
+        //Log("" << message << std::endl);
     }
 };
 
@@ -30,7 +62,7 @@ bool validateMeshPrimitives(const aiScene* scene) {
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
         const aiMesh* mesh = scene->mMeshes[i];
         if (mesh->mPrimitiveTypes != aiPrimitiveType_TRIANGLE) {
-            std::cout << "Mesh contains non-triangle primitives." << std::endl;
+            Log("Mesh contains non-triangle primitives." << std::endl);
             return false;
         }
     }
@@ -39,7 +71,7 @@ bool validateMeshPrimitives(const aiScene* scene) {
 
 bool validate(const aiScene* scene) {
     if (!scene->HasMeshes() || !scene->HasMaterials()) {
-        std::cout << "Scene is missing essential components." << std::endl;
+        Log("Scene is missing essential components." << std::endl);
         return false;
     }
     return validateMeshPrimitives(scene);
@@ -98,7 +130,7 @@ int main() {
     scene->mMaterials[0] = material;
 
     if (!validate(scene)) {
-        std::cout << "Error validating scene" << std::endl;
+        Log("Error validating scene" << std::endl);
         return -1;
     }
     // Export the scene to a glTF file
@@ -106,11 +138,11 @@ int main() {
     aiReturn result = exporter.Export(scene, "glb2", "output.glb");
 
     if (result != aiReturn_SUCCESS) {
-        std::cout << "Error exporting file: " << exporter.GetErrorString() << std::endl;
+        Log("Error exporting file: " << exporter.GetErrorString() << std::endl);
         return -1;
     }
 
-    std::cout << "Exported successfully to output.gltf" << std::endl;
+    Log("Exported successfully to output.gltf" << std::endl);
 
     // Clean up
     delete scene;

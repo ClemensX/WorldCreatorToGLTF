@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.10)
 project(WorldCreatorToGLTF)
 
+if(MSVC)
+  message(STATUS "UNICODE chars enabled for MSVC")
+  add_definitions(-DUNICODE -D_UNICODE)
+  add_compile_options(/sdl)
+  # comment next line to get deprecation errors:
+  add_compile_options(/wd4996)
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated")
+elseif(APPLE)
+  add_definitions(-DALLOW_USING_NON_TRANSFER_ONLY_QUEUE)
+  add_compile_options(-Wall -Wextra -Werror -Wno-error=unused-variable -Wno-error=unused-function
+  -Wno-error=implicit-function-declaration -Wno-return-type -Wno-unused-parameter -Wno-unknown-pragmas
+  -Wno-defaulted-function-deleted -Wno-unused-private-field -Wno-sign-compare -Wno-deprecated-declarations
+  -Wno-unused-but-set-variable -Wno-format-security -Wno-null-conversion -Wno-error=deprecated
+  )
+endif()
+
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
