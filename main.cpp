@@ -54,18 +54,38 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
         return tinygltf::Texture();
     }
 
+    // Create a tinygltf::Image
     tinygltf::Image image;
     image.width = width;
     image.height = height;
     image.component = channels;
     image.bits = 8;
     image.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
-    image.image.resize(width * height * channels);
-    std::copy(data, data + width * height * channels, image.image.begin());
+
+    // Create a tinygltf::Buffer and tinygltf::BufferView for the image
+    tinygltf::Buffer buffer;
+    buffer.data.resize(width * height * channels);
+    std::copy(data, data + width * height * channels, buffer.data.begin());
     stbi_image_free(data);
 
+    tinygltf::BufferView bufferView;
+    bufferView.buffer = static_cast<int>(model.buffers.size());
+    bufferView.byteOffset = 0;
+    bufferView.byteLength = static_cast<int>(buffer.data.size());
+    bufferView.target = 0; // No specific target
+
+    // Add the buffer and buffer view to the model
+    model.buffers.push_back(buffer);
+    model.bufferViews.push_back(bufferView);
+
+    // Set the buffer view for the image
+    image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
+    image.mimeType = "image/png"; // Set the appropriate MIME type
+
+    // Add the image to the model
     model.images.push_back(image);
 
+    // Create a tinygltf::Texture
     tinygltf::Texture texture;
     texture.source = static_cast<int>(model.images.size() - 1);
     model.textures.push_back(texture);
@@ -73,10 +93,11 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     return texture;
 }
 
-// Function to create a tinygltf material
-tinygltf::Material CreateTinyGltfMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles) {
-    tinygltf::Material material;
-    tinygltf::PbrMetallicRoughness pbr;
+// Function to add textures to tinygltf material
+void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles) {
+    assert(model.materials.size() == 1);
+    tinygltf::Material &material = model.materials[0];
+    tinygltf::PbrMetallicRoughness &pbr = material.pbrMetallicRoughness;
 
     for (const auto& filePath : mapFiles) {
         tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
@@ -94,11 +115,6 @@ tinygltf::Material CreateTinyGltfMaterial(tinygltf::Model& model, const std::vec
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
-
-    material.pbrMetallicRoughness = pbr;
-    model.materials.push_back(material);
-
-    return material;
 }
 
 // Function to create a tinygltf mesh
@@ -294,7 +310,7 @@ int main() {
         "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
-    //tinygltf::Material material = CreateTinyGltfMaterial(model, mapFiles);
+    AddTexturesToMaterial(model, mapFiles);
     //tinygltf::Mesh mesh = CreateTinyGltfMesh(model);
     //tinygltf::Scene scene = CreateTinyGltfScene(model);
 
