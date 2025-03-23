@@ -58,18 +58,33 @@ public:
     }
 };
 
-// Function to load a texture map using Assimp
-aiTexture* LoadTexture(const std::string& filePath) {
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filePath, aiProcess_Triangulate | aiProcess_FlipUVs);
-    if (!scene || !scene->HasTextures()) {
-        Log("Failed to load texture: " << filePath << std::endl);
-        return nullptr;
+// Function to load a texture using stb_image
+unsigned char* LoadTextureData(const std::string& filePath, int& width, int& height, int& channels) {
+    unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
+    if (!data) {
+        std::cerr << "Failed to load texture: " << filePath << std::endl;
     }
-    return scene->mTextures[0];
+    return data;
 }
 
-// add textures to the scene
+// Function to create an aiTexture from loaded texture data
+aiTexture* CreateAiTexture(unsigned char* data, int width, int height, int channels) {
+    aiTexture* texture = new aiTexture();
+    texture->mWidth = width;
+    texture->mHeight = height;
+    texture->pcData = new aiTexel[width * height];
+
+    for (int i = 0; i < width * height; ++i) {
+        texture->pcData[i].r = data[i * channels];
+        texture->pcData[i].g = data[i * channels + 1];
+        texture->pcData[i].b = data[i * channels + 2];
+        texture->pcData[i].a = (channels == 4) ? data[i * channels + 3] : 255;
+    }
+
+    return texture;
+}
+
+// Function to export maps to glTF 2.0
 void addTextures(const std::vector<std::string>& mapFiles, aiScene* scene) {
     if (scene->mNumMaterials == 0) {
         Log("No materials in the scene." << std::endl);
@@ -80,54 +95,41 @@ void addTextures(const std::vector<std::string>& mapFiles, aiScene* scene) {
 
     for (const auto& filePath : mapFiles) {
         int width, height, channels;
-        aiTexture* aiTex = LoadTexture(filePath);
-        if (aiTex) {
-            // Add the texture to the scene
-            scene->mTextures = new aiTexture * [scene->mNumTextures + 1];
-            scene->mTextures[scene->mNumTextures] = aiTex;
-            scene->mNumTextures++;
+        unsigned char* data = LoadTextureData(filePath, width, height, channels);
+        if (data) {
+            aiTexture* aiTex = CreateAiTexture(data, width, height, channels);
+            if (aiTex) {
+                // Add the texture to the scene
+                aiTexture** newTextures = new aiTexture * [scene->mNumTextures + 1];
+                for (unsigned int i = 0; i < scene->mNumTextures; ++i) {
+                    newTextures[i] = scene->mTextures[i];
+                }
+                newTextures[scene->mNumTextures] = aiTex;
+                delete[] scene->mTextures;
+                scene->mTextures = newTextures;
+                scene->mNumTextures++;
 
-            // Assign textures to material based on file type
-            aiString texturePath(filePath);
-            if (filePath.find("Color") != std::string::npos) {
-                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_DIFFUSE(0));
+                // Assign textures to material based on file type
+                aiString texturePath("*" + std::to_string(scene->mNumTextures - 1));
+                if (filePath.find("Color") != std::string::npos) {
+                    material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_DIFFUSE(0));
+                }
+                else if (filePath.find("Normal") != std::string::npos) {
+                    material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_NORMALS(0));
+                }
+                else if (filePath.find("Roughness") != std::string::npos) {
+                    material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_SHININESS(0));
+                }
+                else if (filePath.find("Metalness") != std::string::npos) {
+                    material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_REFLECTION(0));
+                }
+                else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+                    material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_AMBIENT(0));
+                }
             }
-            else if (filePath.find("Normal") != std::string::npos) {
-                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_NORMALS(0));
-            }
-            else if (filePath.find("Roughness") != std::string::npos) {
-                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_SHININESS(0));
-            }
-            else if (filePath.find("Metalness") != std::string::npos) {
-                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_REFLECTION(0));
-            }
-            else if (filePath.find("AmbientOcclusion") != std::string::npos) {
-                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_AMBIENT(0));
-            }
+            stbi_image_free(data);
         }
     }
-
-    //for (const auto& filePath : mapFiles) {
-    //    aiTexture* aiTex = LoadTexture(filePath);
-    //    if (aiTex) {
-    //        // Assign textures to material based on file type
-    //        if (filePath.find("Color") != std::string::npos) {
-    //            material.pbrMetallicRoughness.baseColorTexture.index = texture.source;
-    //        }
-    //        else if (filePath.find("Normal") != std::string::npos) {
-    //            material.normalTexture.index = texture.source;
-    //        }
-    //        else if (filePath.find("Roughness") != std::string::npos) {
-    //            material.pbrMetallicRoughness.roughnessTexture.index = texture.source;
-    //        }
-    //        else if (filePath.find("Metalness") != std::string::npos) {
-    //            material.pbrMetallicRoughness.metallicTexture.index = texture.source;
-    //        }
-    //        else if (filePath.find("AmbientOcclusion") != std::string::npos) {
-    //            material.occlusionTexture.index = texture.source;
-    //        }
-    //    }
-    //}
 }
 
 bool validateMeshPrimitives(const aiScene* scene) {
