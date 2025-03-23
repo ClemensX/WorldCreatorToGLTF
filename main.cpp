@@ -58,6 +58,78 @@ public:
     }
 };
 
+// Function to load a texture map using Assimp
+aiTexture* LoadTexture(const std::string& filePath) {
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(filePath, aiProcess_Triangulate | aiProcess_FlipUVs);
+    if (!scene || !scene->HasTextures()) {
+        Log("Failed to load texture: " << filePath << std::endl);
+        return nullptr;
+    }
+    return scene->mTextures[0];
+}
+
+// add textures to the scene
+void addTextures(const std::vector<std::string>& mapFiles, aiScene* scene) {
+    if (scene->mNumMaterials == 0) {
+        Log("No materials in the scene." << std::endl);
+        return;
+    }
+
+    aiMaterial* material = scene->mMaterials[0];
+
+    for (const auto& filePath : mapFiles) {
+        int width, height, channels;
+        aiTexture* aiTex = LoadTexture(filePath);
+        if (aiTex) {
+            // Add the texture to the scene
+            scene->mTextures = new aiTexture * [scene->mNumTextures + 1];
+            scene->mTextures[scene->mNumTextures] = aiTex;
+            scene->mNumTextures++;
+
+            // Assign textures to material based on file type
+            aiString texturePath(filePath);
+            if (filePath.find("Color") != std::string::npos) {
+                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_DIFFUSE(0));
+            }
+            else if (filePath.find("Normal") != std::string::npos) {
+                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_NORMALS(0));
+            }
+            else if (filePath.find("Roughness") != std::string::npos) {
+                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_SHININESS(0));
+            }
+            else if (filePath.find("Metalness") != std::string::npos) {
+                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_REFLECTION(0));
+            }
+            else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+                material->AddProperty(&texturePath, AI_MATKEY_TEXTURE_AMBIENT(0));
+            }
+        }
+    }
+
+    //for (const auto& filePath : mapFiles) {
+    //    aiTexture* aiTex = LoadTexture(filePath);
+    //    if (aiTex) {
+    //        // Assign textures to material based on file type
+    //        if (filePath.find("Color") != std::string::npos) {
+    //            material.pbrMetallicRoughness.baseColorTexture.index = texture.source;
+    //        }
+    //        else if (filePath.find("Normal") != std::string::npos) {
+    //            material.normalTexture.index = texture.source;
+    //        }
+    //        else if (filePath.find("Roughness") != std::string::npos) {
+    //            material.pbrMetallicRoughness.roughnessTexture.index = texture.source;
+    //        }
+    //        else if (filePath.find("Metalness") != std::string::npos) {
+    //            material.pbrMetallicRoughness.metallicTexture.index = texture.source;
+    //        }
+    //        else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+    //            material.occlusionTexture.index = texture.source;
+    //        }
+    //    }
+    //}
+}
+
 bool validateMeshPrimitives(const aiScene* scene) {
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
         const aiMesh* mesh = scene->mMeshes[i];
@@ -78,6 +150,14 @@ bool validate(const aiScene* scene) {
 }
 
 int main() {
+    std::vector<std::string> mapFiles = {
+        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
+    };
+
     // Create a logger instance
     Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
 
@@ -128,6 +208,9 @@ int main() {
     float roughness = 0.5f;
     material->AddProperty(&roughness, 1, AI_MATKEY_ROUGHNESS_FACTOR);
     scene->mMaterials[0] = material;
+
+    addTextures(mapFiles, scene);
+
 
     if (!validate(scene)) {
         Log("Error validating scene" << std::endl);
