@@ -55,7 +55,7 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     }
 
     // Create a tinygltf::Image
-    tinygltf::Image image;
+    tinygltf::Image image{};
     image.width = width;
     image.height = height;
     image.component = channels;
@@ -63,12 +63,12 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     image.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
 
     // Create a tinygltf::Buffer and tinygltf::BufferView for the image
-    tinygltf::Buffer buffer;
+    tinygltf::Buffer buffer{};
     buffer.data.resize(width * height * channels);
     std::copy(data, data + width * height * channels, buffer.data.begin());
     stbi_image_free(data);
 
-    tinygltf::BufferView bufferView;
+    tinygltf::BufferView bufferView{};
     bufferView.buffer = static_cast<int>(model.buffers.size());
     bufferView.byteOffset = 0;
     bufferView.byteLength = static_cast<int>(buffer.data.size());
@@ -80,13 +80,14 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
 
     // Set the buffer view for the image
     image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
-    image.mimeType = "image/png"; // Set the appropriate MIME type
+    //image.mimeType = "image/png"; // Set the appropriate MIME type
+    image.uri = "Cube_BaseColor.png";
 
     // Add the image to the model
     model.images.push_back(image);
 
     // Create a tinygltf::Texture
-    tinygltf::Texture texture;
+    tinygltf::Texture texture{};
     texture.source = static_cast<int>(model.images.size() - 1);
     model.textures.push_back(texture);
 
@@ -115,72 +116,6 @@ void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
-}
-
-// Function to create a tinygltf mesh
-tinygltf::Mesh CreateTinyGltfMesh(tinygltf::Model& model) {
-    tinygltf::Mesh mesh;
-    tinygltf::Primitive primitive;
-
-    std::vector<float> positions = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-    std::vector<uint16_t> indices = {0, 1, 2};
-
-    tinygltf::Buffer buffer;
-    buffer.data.resize(positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t));
-    std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
-    std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size() * sizeof(uint16_t));
-    model.buffers.push_back(buffer);
-
-    tinygltf::BufferView positionBufferView;
-    positionBufferView.buffer = 0;
-    positionBufferView.byteOffset = 0;
-    positionBufferView.byteLength = positions.size() * sizeof(float);
-    positionBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-    model.bufferViews.push_back(positionBufferView);
-
-    tinygltf::BufferView indexBufferView;
-    indexBufferView.buffer = 0;
-    indexBufferView.byteOffset = positions.size() * sizeof(float);
-    indexBufferView.byteLength = indices.size() * sizeof(uint16_t);
-    indexBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-    model.bufferViews.push_back(indexBufferView);
-
-    tinygltf::Accessor positionAccessor;
-    positionAccessor.bufferView = 0;
-    positionAccessor.byteOffset = 0;
-    positionAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-    positionAccessor.count = static_cast<int>(positions.size() / 3);
-    positionAccessor.type = TINYGLTF_TYPE_VEC3;
-    model.accessors.push_back(positionAccessor);
-
-    tinygltf::Accessor indexAccessor;
-    indexAccessor.bufferView = 1;
-    indexAccessor.byteOffset = 0;
-    indexAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
-    indexAccessor.count = static_cast<int>(indices.size());
-    indexAccessor.type = TINYGLTF_TYPE_SCALAR;
-    model.accessors.push_back(indexAccessor);
-
-    primitive.attributes["POSITION"] = 0;
-    primitive.indices = 1;
-    primitive.mode = TINYGLTF_MODE_TRIANGLES;
-    model.meshes.push_back(mesh);
-
-    return mesh;
-}
-
-// Function to create a tinygltf scene
-tinygltf::Scene CreateTinyGltfScene(tinygltf::Model& model) {
-    tinygltf::Scene scene;
-    tinygltf::Node node;
-
-    node.mesh = 0;
-    model.nodes.push_back(node);
-
-    scene.nodes.push_back(0);
-    model.scenes.push_back(scene);
-
-    return scene;
 }
 
 bool ValidateTinyGltfModel(const tinygltf::Model& model) {
@@ -215,61 +150,86 @@ void createModel(tinygltf::Model& m) {
     tinygltf::Mesh mesh;
     tinygltf::Primitive primitive;
     tinygltf::Node node;
-    tinygltf::Buffer buffer;
-    tinygltf::BufferView bufferView1;
-    tinygltf::BufferView bufferView2;
-    tinygltf::Accessor accessor1;
-    tinygltf::Accessor accessor2;
     tinygltf::Asset asset;
 
-    // This is the raw data buffer. 
-    buffer.data = {
-        // 6 bytes of indices and two bytes of padding
-        0x00,0x00,0x01,0x00,0x02,0x00,0x00,0x00,
-        // 36 bytes of floating point numbers
-        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
-        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
-        0x00,0x00,0x00,0x00 };
+    // define buffer data: positions, inices and text coords
+    std::vector<float> positions = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+    std::vector<uint16_t> indices = { 0, 1, 2 };
+    //std::vector<float> positions = {
+    //    // 36 bytes of floating point numbers
+    //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    //    0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    //    0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    //    0x00,0x00,0x00,0x00 };
+    //// 6 bytes of indices and two bytes of padding
+    //std::vector<uint16_t> indices = { 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00 };
+    std::vector<float> texcoords = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 
-    // "The indices of the vertices (ELEMENT_ARRAY_BUFFER) take up 6 bytes in the
-    // start of the buffer.
-    bufferView1.buffer = 0;
-    bufferView1.byteOffset = 0;
-    bufferView1.byteLength = 6;
-    bufferView1.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+    // create buffer from the input data
+    tinygltf::Buffer buffer;
+    buffer.data.resize(positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t) + texcoords.size() * sizeof(float));
+    std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
+    std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size() * sizeof(uint16_t));
+    std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t), texcoords.data(), texcoords.size() * sizeof(float));
+    m.buffers.push_back(buffer);
 
-    // The vertices take up 36 bytes (3 vertices * 3 floating points * 4 bytes)
-    // at position 8 in the buffer and are of type ARRAY_BUFFER
-    bufferView2.buffer = 0;
-    bufferView2.byteOffset = 8;
-    bufferView2.byteLength = 36;
-    bufferView2.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    // define the buffer views
+    tinygltf::BufferView positionBufferView;
+    positionBufferView.buffer = 0;
+    positionBufferView.byteOffset = 0;
+    positionBufferView.byteLength = positions.size() * sizeof(float);
+    positionBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    m.bufferViews.push_back(positionBufferView);
 
-    // Describe the layout of bufferView1, the indices of the vertices
-    accessor1.bufferView = 0;
-    accessor1.byteOffset = 0;
-    accessor1.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
-    accessor1.count = 3;
-    accessor1.type = TINYGLTF_TYPE_SCALAR;
-    accessor1.maxValues.push_back(2);
-    accessor1.minValues.push_back(0);
+    tinygltf::BufferView indexBufferView;
+    indexBufferView.buffer = 0;
+    indexBufferView.byteOffset = positions.size() * sizeof(float);
+    indexBufferView.byteLength = indices.size() * sizeof(uint16_t);
+    indexBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+    //m.bufferViews.push_back(indexBufferView);
 
-    // Describe the layout of bufferView2, the vertices themself
-    accessor2.bufferView = 1;
-    accessor2.byteOffset = 0;
-    accessor2.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-    accessor2.count = 3;
-    accessor2.type = TINYGLTF_TYPE_VEC3;
-    accessor2.maxValues = { 1.0, 1.0, 0.0 };
-    accessor2.minValues = { 0.0, 0.0, 0.0 };
+    tinygltf::BufferView texcoordBufferView;
+    texcoordBufferView.buffer = 0;
+    texcoordBufferView.byteOffset = positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t);
+    texcoordBufferView.byteLength = texcoords.size() * sizeof(float);
+    texcoordBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    //m.bufferViews.push_back(texcoordBufferView);
+
+    // define the accessors
+
+    tinygltf::Accessor positionAccessor;
+    positionAccessor.bufferView = 0;
+    positionAccessor.byteOffset = 0;
+    positionAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+    positionAccessor.count = static_cast<int>(positions.size() / 3);
+    positionAccessor.type = TINYGLTF_TYPE_VEC3;
+    positionAccessor.maxValues = { 1.0, 1.0, 0.0 };
+    positionAccessor.minValues = { 0.0, 0.0, 0.0 };
+    m.accessors.push_back(positionAccessor);
+
+    tinygltf::Accessor indexAccessor;
+    indexAccessor.bufferView = 1;
+    indexAccessor.byteOffset = 0;
+    indexAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+    indexAccessor.count = static_cast<int>(indices.size());
+    indexAccessor.type = TINYGLTF_TYPE_SCALAR;
+    //m.accessors.push_back(indexAccessor);
+
+    tinygltf::Accessor texcoordAccessor;
+    texcoordAccessor.bufferView = 2;
+    texcoordAccessor.byteOffset = 0;
+    texcoordAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
+    texcoordAccessor.count = static_cast<int>(texcoords.size() / 2);
+    texcoordAccessor.type = TINYGLTF_TYPE_VEC2;
+    //m.accessors.push_back(texcoordAccessor);
 
     // Build the mesh primitive and add it to the mesh
-    primitive.indices = 0;                 // The index of the accessor for the vertex indices
-    primitive.attributes["POSITION"] = 1;  // The index of the accessor for positions
-    primitive.material = 0;
+    primitive.attributes["POSITION"] = 0;
+    //primitive.indices = 1;
+    //primitive.attributes["TEXCOORD_0"] = 2;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
+    primitive.material = 0;
     mesh.primitives.push_back(primitive);
 
     // Other tie ups
@@ -285,11 +245,6 @@ void createModel(tinygltf::Model& m) {
     m.scenes.push_back(scene);
     m.meshes.push_back(mesh);
     m.nodes.push_back(node);
-    m.buffers.push_back(buffer);
-    m.bufferViews.push_back(bufferView1);
-    m.bufferViews.push_back(bufferView2);
-    m.accessors.push_back(accessor1);
-    m.accessors.push_back(accessor2);
     m.asset = asset;
 
     // Create a simple material
@@ -299,22 +254,18 @@ void createModel(tinygltf::Model& m) {
     m.materials.push_back(mat);
 }
 
-int main() {
+int main1() {
     tinygltf::Model model;
     createModel(model);
     std::vector<std::string> mapFiles = {
-        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
+        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png"//,
+        //"C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
+        //"C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
+        //"C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
+        //"C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
-    AddTexturesToMaterial(model, mapFiles);
-    //tinygltf::Mesh mesh = CreateTinyGltfMesh(model);
-    //tinygltf::Scene scene = CreateTinyGltfScene(model);
-
-    //model.defaultScene = 0;
+    //AddTexturesToMaterial(model, mapFiles);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
@@ -334,7 +285,43 @@ int main() {
     //    return -1;
     //}
 
-    Log("Exported successfully to output.glb" << std::endl);
+    Log("Exported successfully" << std::endl);
 
     return 0;
+}
+
+int main(int argc, char* argv[]) {
+    //if (argc != 3) {
+    //    std::cout << "Needs input.gltf output.gltf" << std::endl;
+    //    return EXIT_FAILURE;
+    //}
+
+    tinygltf::Model modelOK;
+    tinygltf::TinyGLTF loader;
+    std::string err;
+    std::string warn;
+    std::string input_filename("Cube.gltf");
+    std::string output_filename("Cube2.gltf");
+    std::string embedded_filename =
+        output_filename.substr(0, output_filename.size() - 5) + "-Embedded.gltf";
+
+    // assume ascii glTF.
+    bool ret = loader.LoadASCIIFromFile(&modelOK, &err, &warn, input_filename.c_str());
+    if (!warn.empty()) {
+        std::cout << "warn : " << warn << std::endl;
+    }
+    if (!ret) {
+        if (!err.empty()) {
+            std::cerr << err << std::endl;
+        }
+        return EXIT_FAILURE;
+    }
+    //loader.WriteGltfSceneToFile(&model, output_filename);
+
+    // Embedd buffers and images
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+    loader.WriteGltfSceneToFile(&modelOK, embedded_filename, true, true);
+#endif
+    main1();
+    return EXIT_SUCCESS;
 }
