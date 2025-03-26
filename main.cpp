@@ -84,7 +84,7 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     //// Set the buffer view for the image
     //image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
     //image.mimeType = "image/png"; // Set the appropriate MIME type
-    image.uri = "Cube_BaseColor.png";
+    image.uri = filePath;
 
     // Add the image to the model
     model.images.push_back(image);
@@ -259,16 +259,16 @@ void createModel(tinygltf::Model& m) {
     m.materials.push_back(mat);
 }
 
-int main1() {
+int main() {
     tinygltf::Model model;
     createModel(model);
     std::vector<std::string> mapFiles = {
-        "Cube_BaseColor.png"//,
-        //"C:/dev/cpp/data/raw/desert_Colormap_0_0.png"//,
-        //"C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
-        //"C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
-        //"C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
-        //"C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
+        //"Cube_BaseColor.png"//,
+        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png"
+        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
+        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
     AddTexturesToMaterial(model, mapFiles);
@@ -297,7 +297,7 @@ int main1() {
     return 0;
 }
 
-int main(int argc, char* argv[]) {
+int main2(int argc, char* argv[]) {
     //if (argc != 3) {
     //    std::cout << "Needs input.gltf output.gltf" << std::endl;
     //    return EXIT_FAILURE;
@@ -329,6 +329,6 @@ int main(int argc, char* argv[]) {
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
     loader.WriteGltfSceneToFile(&modelOK, embedded_filename, true, true);
 #endif
-    main1();
+    //main1();
     return EXIT_SUCCESS;
 }
