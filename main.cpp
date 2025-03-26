@@ -147,7 +147,7 @@ bool ValidateTinyGltfModel(const tinygltf::Model& model) {
     return valid;
 }
 
-void createModel(tinygltf::Model& m) {
+void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     // Create a model with a single mesh and save it as a gltf file
     tinygltf::Scene scene;
     tinygltf::Mesh mesh;
@@ -260,12 +260,32 @@ void createModel(tinygltf::Model& m) {
 }
 
 int main() {
+
+    tinygltf::Model modelMesh;
     tinygltf::Model model;
-    createModel(model);
+    if (true) {
+        tinygltf::TinyGLTF loader;
+        std::string err;
+        std::string warn;
+        std::string input_filename("C:/dev/cpp/data/raw/desert_Mesh_0_0.glb");
+        // assume ascii glTF.
+        bool ret = loader.LoadBinaryFromFile(&modelMesh, &err, &warn, input_filename.c_str());
+        if (!warn.empty()) {
+            std::cout << "warn : " << warn << std::endl;
+        }
+        if (!ret) {
+            if (!err.empty()) {
+                std::cerr << err << std::endl;
+            }
+            return EXIT_FAILURE;
+        }
+        Log("Loaded mesh model" << std::endl);
+    }
+    createModel(model, modelMesh);
     std::vector<std::string> mapFiles = {
         //"Cube_BaseColor.png"//,
         "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png"
+        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
         "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
         "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
         "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
