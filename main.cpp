@@ -61,25 +61,28 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     image.component = channels;
     image.bits = 8;
     image.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
-
-    // Create a tinygltf::Buffer and tinygltf::BufferView for the image
-    tinygltf::Buffer buffer{};
-    buffer.data.resize(width * height * channels);
-    std::copy(data, data + width * height * channels, buffer.data.begin());
+    image.image.resize(width * height * channels);
+    std::copy(data, data + width * height * channels, image.image.begin());
     stbi_image_free(data);
 
-    tinygltf::BufferView bufferView{};
-    bufferView.buffer = static_cast<int>(model.buffers.size());
-    bufferView.byteOffset = 0;
-    bufferView.byteLength = static_cast<int>(buffer.data.size());
-    bufferView.target = 0; // No specific target
+    // Create a tinygltf::Buffer and tinygltf::BufferView for the image
+    //tinygltf::Buffer buffer{};
+    //buffer.data.resize(width * height * channels);
+    //std::copy(data, data + width * height * channels, buffer.data.begin());
+    //stbi_image_free(data);
 
-    // Add the buffer and buffer view to the model
-    model.buffers.push_back(buffer);
-    model.bufferViews.push_back(bufferView);
+    //tinygltf::BufferView bufferView{};
+    //bufferView.buffer = static_cast<int>(model.buffers.size());
+    //bufferView.byteOffset = 0;
+    //bufferView.byteLength = static_cast<int>(buffer.data.size());
+    //bufferView.target = 0; // No specific target
 
-    // Set the buffer view for the image
-    image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
+    //// Add the buffer and buffer view to the model
+    //model.buffers.push_back(buffer);
+    //model.bufferViews.push_back(bufferView);
+
+    //// Set the buffer view for the image
+    //image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
     //image.mimeType = "image/png"; // Set the appropriate MIME type
     image.uri = "Cube_BaseColor.png";
 
@@ -154,7 +157,7 @@ void createModel(tinygltf::Model& m) {
 
     // define buffer data: positions, inices and text coords
     std::vector<float> positions = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
-    std::vector<uint16_t> indices = { 0, 1, 2 };
+    std::vector<uint16_t> indices = { 0, 1, 2, 0, 1, 2 }; // doubled length for 4 byte multiple
     //std::vector<float> positions = {
     //    // 36 bytes of floating point numbers
     //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -168,7 +171,8 @@ void createModel(tinygltf::Model& m) {
 
     // create buffer from the input data
     tinygltf::Buffer buffer;
-    buffer.data.resize(positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t) + texcoords.size() * sizeof(float));
+    size_t totalBufferLength = positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t) + texcoords.size() * sizeof(float);
+    buffer.data.resize(totalBufferLength);
     std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
     std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size() * sizeof(uint16_t));
     std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t), texcoords.data(), texcoords.size() * sizeof(float));
@@ -187,14 +191,14 @@ void createModel(tinygltf::Model& m) {
     indexBufferView.byteOffset = positions.size() * sizeof(float);
     indexBufferView.byteLength = indices.size() * sizeof(uint16_t);
     indexBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-    //m.bufferViews.push_back(indexBufferView);
+    m.bufferViews.push_back(indexBufferView);
 
     tinygltf::BufferView texcoordBufferView;
     texcoordBufferView.buffer = 0;
     texcoordBufferView.byteOffset = positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t);
     texcoordBufferView.byteLength = texcoords.size() * sizeof(float);
     texcoordBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-    //m.bufferViews.push_back(texcoordBufferView);
+    m.bufferViews.push_back(texcoordBufferView);
 
     // define the accessors
 
@@ -213,8 +217,9 @@ void createModel(tinygltf::Model& m) {
     indexAccessor.byteOffset = 0;
     indexAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
     indexAccessor.count = static_cast<int>(indices.size());
+    indexAccessor.count = static_cast<int>(3); // override
     indexAccessor.type = TINYGLTF_TYPE_SCALAR;
-    //m.accessors.push_back(indexAccessor);
+    m.accessors.push_back(indexAccessor);
 
     tinygltf::Accessor texcoordAccessor;
     texcoordAccessor.bufferView = 2;
@@ -222,12 +227,12 @@ void createModel(tinygltf::Model& m) {
     texcoordAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
     texcoordAccessor.count = static_cast<int>(texcoords.size() / 2);
     texcoordAccessor.type = TINYGLTF_TYPE_VEC2;
-    //m.accessors.push_back(texcoordAccessor);
+    m.accessors.push_back(texcoordAccessor);
 
     // Build the mesh primitive and add it to the mesh
     primitive.attributes["POSITION"] = 0;
-    //primitive.indices = 1;
-    //primitive.attributes["TEXCOORD_0"] = 2;
+    primitive.indices = 1;
+    primitive.attributes["TEXCOORD_0"] = 2;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
     primitive.material = 0;
     mesh.primitives.push_back(primitive);
@@ -258,14 +263,15 @@ int main1() {
     tinygltf::Model model;
     createModel(model);
     std::vector<std::string> mapFiles = {
-        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png"//,
+        "Cube_BaseColor.png"//,
+        //"C:/dev/cpp/data/raw/desert_Colormap_0_0.png"//,
         //"C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
         //"C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
         //"C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
         //"C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
-    //AddTexturesToMaterial(model, mapFiles);
+    AddTexturesToMaterial(model, mapFiles);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
@@ -280,6 +286,7 @@ int main1() {
         true, // pretty print
         false); // write binary
 
+    // writing glb complains with warninig:: URI is used in GLB container.
     //if (!gltf.WriteGltfSceneToFile(&model, "output.glb", true, true, true, true)) {
     //    Log("Failed to write glTF file" << std::endl);
     //    return -1;
