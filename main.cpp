@@ -103,8 +103,24 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     return texture;
 }
 
+// Function to create a tinygltf texture from loaded Image
+tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, tinygltf::Image& metallicRoughnessImage) {
+
+    metallicRoughnessImage.uri = "InMemoryMetallicRoughness.png";
+
+    // Add the image to the model
+    model.images.push_back(metallicRoughnessImage);
+
+    // Create a tinygltf::Texture
+    tinygltf::Texture texture{};
+    texture.source = static_cast<int>(model.images.size() - 1);
+    model.textures.push_back(texture);
+
+    return texture;
+}
+
 // Function to add textures to tinygltf material
-void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles) {
+void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles, tinygltf::Image& metallicRoughnessImage) {
     assert(model.materials.size() == 1);
     tinygltf::Material& material = model.materials[0];
     tinygltf::PbrMetallicRoughness& pbr = material.pbrMetallicRoughness;
@@ -113,22 +129,16 @@ void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string
         tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
         if (filePath.find("Color") != std::string::npos) {
             pbr.baseColorTexture.index = static_cast<int>(model.textures.size() - 1);
-        }
-        else if (filePath.find("Normal") != std::string::npos) {
+        } else if (filePath.find("Normal") != std::string::npos) {
             material.normalTexture.index = static_cast<int>(model.textures.size() - 1);
-        }
-        else if (filePath.find("Roughness") != std::string::npos) {
-            pbr.roughnessFactor = 1.0;
-            pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
-        }
-        else if (filePath.find("Metalness") != std::string::npos) {
-            pbr.metallicFactor = 1.0;
-            pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
-        }
-        else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+        } else if (filePath.find("AmbientOcclusion") != std::string::npos) {
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
+    // now add merged met/rough texture:
+    tinygltf::Texture texture = CreateTinyGltfTexture(model, metallicRoughnessImage);
+    pbr.roughnessFactor = 1.0;
+    pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
 }
 
 // Function to merge roughness and metalness maps into a single metallicRoughness map
@@ -141,8 +151,7 @@ void MergeRoughnessIntoMetalness(const std::vector<std::string>& mapFiles, tinyg
     for (const auto& filePath : mapFiles) {
         if (filePath.find("Roughness") != std::string::npos) {
             roughnessPath = filePath;
-        }
-        else if (filePath.find("Metalness") != std::string::npos) {
+        } else if (filePath.find("Metalness") != std::string::npos) {
             metalnessPath = filePath;
         }
     }
@@ -464,7 +473,7 @@ int main() {
     tinygltf::Image metallicRoughnessImage; // partly filled, not put to gltf model
     MergeRoughnessIntoMetalness(mapFiles, metallicRoughnessImage);
 
-    AddTexturesToMaterial(model, mapFiles);
+    AddTexturesToMaterial(model, mapFiles, metallicRoughnessImage);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
