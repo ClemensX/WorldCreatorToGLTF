@@ -37,6 +37,12 @@
 #define LogCond(y,x)
 #endif
 
+#define Error(x)\
+{\
+    Log(x); \
+    exit(0); \
+}
+
 // Function to load a texture using stb_image
 unsigned char* LoadTextureData(const std::string& filePath, int& width, int& height, int& channels) {
     unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
@@ -100,26 +106,95 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
 // Function to add textures to tinygltf material
 void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles) {
     assert(model.materials.size() == 1);
-    tinygltf::Material &material = model.materials[0];
-    tinygltf::PbrMetallicRoughness &pbr = material.pbrMetallicRoughness;
+    tinygltf::Material& material = model.materials[0];
+    tinygltf::PbrMetallicRoughness& pbr = material.pbrMetallicRoughness;
 
     for (const auto& filePath : mapFiles) {
         tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
         if (filePath.find("Color") != std::string::npos) {
             pbr.baseColorTexture.index = static_cast<int>(model.textures.size() - 1);
-        } else if (filePath.find("Normal") != std::string::npos) {
+        }
+        else if (filePath.find("Normal") != std::string::npos) {
             material.normalTexture.index = static_cast<int>(model.textures.size() - 1);
-        } else if (filePath.find("Roughness") != std::string::npos) {
+        }
+        else if (filePath.find("Roughness") != std::string::npos) {
             pbr.roughnessFactor = 1.0;
             pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
-        } else if (filePath.find("Metalness") != std::string::npos) {
+        }
+        else if (filePath.find("Metalness") != std::string::npos) {
             pbr.metallicFactor = 1.0;
             pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
-        } else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+        }
+        else if (filePath.find("AmbientOcclusion") != std::string::npos) {
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
 }
+
+// Function to merge roughness and metalness maps into a single metallicRoughness map
+// we assume that each map has the same value in all channels, so we just copy the gree channel from the roughness map
+// into the green channel of the metallness map. Red and alpha are all set to 255
+void MergeRoughnessIntoMetalness(const std::vector<std::string>& mapFiles, tinygltf::Image& metallicRoughnessImage) {
+    std::string metalnessPath;
+    std::string roughnessPath;
+
+    for (const auto& filePath : mapFiles) {
+        if (filePath.find("Roughness") != std::string::npos) {
+            roughnessPath = filePath;
+        }
+        else if (filePath.find("Metalness") != std::string::npos) {
+            metalnessPath = filePath;
+        }
+    }
+    if (roughnessPath.empty() || metalnessPath.empty()) {
+        Error("ERROR: Roughness or Metalness map not found" << std::endl);
+    }
+    int width, height, channels;
+    // load metalness grayscale image
+    unsigned char* metalnessData = stbi_load(metalnessPath.c_str(), &width, &height, &channels, 1);
+    if (!metalnessData) {
+        Error("Failed to load metalness texture: " << metalnessPath << std::endl);
+    }
+
+    int roughnessWidth, roughnessHeight, roughnessChannels;
+    // load roughness grayscale image
+    unsigned char* roughnessData = stbi_load(roughnessPath.c_str(), &roughnessWidth, &roughnessHeight, &roughnessChannels, 1);
+    if (!roughnessData) {
+        Error("Failed to load roughness texture: " << roughnessPath << std::endl);
+    }
+
+    if (width != roughnessWidth || height != roughnessHeight) {
+        Error("Metalness and roughness textures must have the same dimensions." << std::endl);
+    }
+
+    // load metalness again, this time as RGBA, where we want to store the merged image
+    unsigned char* metallicRoughnessData = stbi_load(metalnessPath.c_str(), &width, &height, &channels, 4);
+    if (!metallicRoughnessData) {
+        Error("Failed to load metalness texture: " << metalnessPath << std::endl);
+    }
+
+
+    for (int i = 0; i < width * height; ++i) {
+        metallicRoughnessData[i * 4 + 0] = 255; // Red channel
+        metallicRoughnessData[i * 4 + 1] = roughnessData[i]; // Green channel (roughness)
+        metallicRoughnessData[i * 4 + 2] = metalnessData[i]; // Blue channel (metalness)
+        metallicRoughnessData[i * 4 + 3] = 255; // Alpha channel
+    }
+
+    stbi_image_free(roughnessData);
+    stbi_image_free(metalnessData);
+
+    // fill texture info
+    metallicRoughnessImage.width = width;
+    metallicRoughnessImage.height = height;
+    metallicRoughnessImage.component = 4;
+    metallicRoughnessImage.bits = 8;
+    metallicRoughnessImage.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+    metallicRoughnessImage.image.resize(width * height * 4);
+    std::copy(metallicRoughnessData, metallicRoughnessData + width * height * 4, metallicRoughnessImage.image.begin());
+    stbi_image_free(metallicRoughnessData);
+}
+
 
 bool ValidateTinyGltfModel(const tinygltf::Model& model) {
     tinygltf::TinyGLTF gltf;
@@ -386,6 +461,8 @@ int main() {
         "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
         "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
+    tinygltf::Image metallicRoughnessImage; // partly filled, not put to gltf model
+    MergeRoughnessIntoMetalness(mapFiles, metallicRoughnessImage);
 
     AddTexturesToMaterial(model, mapFiles);
 
