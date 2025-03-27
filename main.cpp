@@ -261,7 +261,7 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     indicesBufferView.byteOffset = positions.size() * sizeof(float);
     indicesBufferView.byteLength = indices.size();
     //indicesBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER; set in extract method
-    //m.bufferViews.push_back(indicesBufferView);
+    m.bufferViews.push_back(indicesBufferView);
 
     tinygltf::BufferView normalBufferView;
     normalBufferView.buffer = 0;
@@ -292,9 +292,10 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     indicesAccessor.bufferView = 1;
     indicesAccessor.byteOffset = 0;
     //indicesAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT; // set in extract method, also count and type
-    indicesAccessor.maxValues = indicesMax;
-    indicesAccessor.minValues = indicesMin;
-    //m.accessors.push_back(indicesAccessor);
+    // do NOT write min/max for index buffer:
+    //indicesAccessor.maxValues = indicesMax;
+    //indicesAccessor.minValues = indicesMin;
+    m.accessors.push_back(indicesAccessor);
 
     tinygltf::Accessor normalAccessor;
     normalAccessor.bufferView = 1;
@@ -315,7 +316,7 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
 
     // Build the mesh primitive and add it to the mesh
     primitive.attributes["POSITION"] = 0;
-    //primitive.indices = 1;
+    primitive.indices = 1;
     //primitive.attributes["NORMAL"] = 1;
     //primitive.attributes["TEXCOORD_0"] = 2;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
