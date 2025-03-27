@@ -241,11 +241,17 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
 
     // create buffer from the input data
     tinygltf::Buffer buffer;
-    size_t totalBufferLength = positions.size() * sizeof(float) + indices.size();// +normals.size() * sizeof(float) + texcoords.size() * sizeof(float);
+    // store buffer sizes
+    size_t ps, is, ns, ts;
+    ps = positions.size() * sizeof(float);
+    is = indices.size(); // we handle this as bytes
+    ns = normals.size() * sizeof(float);
+    ts = texcoords.size() * sizeof(float);
+    size_t totalBufferLength = ps + is + ns;// +ts;
     buffer.data.resize(totalBufferLength);
-    std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
-    std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size());
-    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float), normals.data(), normals.size() * sizeof(float));
+    std::memcpy(buffer.data.data(), positions.data(), ps);
+    std::memcpy(buffer.data.data() + ps, indices.data(), is);
+    std::memcpy(buffer.data.data() + ps + is, normals.data(), ns);
     //std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + normals.size() * sizeof(float), texcoords.data(), texcoords.size() * sizeof(float));
     m.buffers.push_back(buffer);
 
@@ -253,22 +259,22 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     tinygltf::BufferView positionBufferView;
     positionBufferView.buffer = 0;
     positionBufferView.byteOffset = 0;
-    positionBufferView.byteLength = positions.size() * sizeof(float);
+    positionBufferView.byteLength = ps;
     positionBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
     m.bufferViews.push_back(positionBufferView);
 
     indicesBufferView.buffer = 0;
-    indicesBufferView.byteOffset = positions.size() * sizeof(float);
-    indicesBufferView.byteLength = indices.size();
+    indicesBufferView.byteOffset = ps;
+    indicesBufferView.byteLength = is;
     //indicesBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER; set in extract method
     m.bufferViews.push_back(indicesBufferView);
 
     tinygltf::BufferView normalBufferView;
     normalBufferView.buffer = 0;
-    normalBufferView.byteOffset = positions.size() * sizeof(float);
-    normalBufferView.byteLength = normals.size() * sizeof(float);
-    normalBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-    //m.bufferViews.push_back(normalBufferView);
+    normalBufferView.byteOffset = ps + is;
+    normalBufferView.byteLength = ns;
+    normalBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    m.bufferViews.push_back(normalBufferView);
 
     tinygltf::BufferView texcoordBufferView;
     texcoordBufferView.buffer = 0;
@@ -298,13 +304,15 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     m.accessors.push_back(indicesAccessor);
 
     tinygltf::Accessor normalAccessor;
-    normalAccessor.bufferView = 1;
+    normalAccessor.bufferView = 2;
     normalAccessor.byteOffset = 0;
-    normalAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+    normalAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
     normalAccessor.count = static_cast<int>(normals.size() / 3);
-    normalAccessor.count = static_cast<int>(3); // override
-    normalAccessor.type = TINYGLTF_TYPE_SCALAR;
-    //m.accessors.push_back(normalAccessor);
+    //normalAccessor.count = static_cast<int>(3); // override
+    normalAccessor.type = TINYGLTF_TYPE_VEC3;
+    normalAccessor.maxValues = normalMax;
+    normalAccessor.minValues = normalMin;
+    m.accessors.push_back(normalAccessor);
 
     tinygltf::Accessor texcoordAccessor;
     texcoordAccessor.bufferView = 2;
@@ -317,8 +325,8 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     // Build the mesh primitive and add it to the mesh
     primitive.attributes["POSITION"] = 0;
     primitive.indices = 1;
-    //primitive.attributes["NORMAL"] = 1;
-    //primitive.attributes["TEXCOORD_0"] = 2;
+    primitive.attributes["NORMAL"] = 2;
+    //primitive.attributes["TEXCOORD_0"] = 3;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
     primitive.material = 0;
     mesh.primitives.push_back(primitive);
