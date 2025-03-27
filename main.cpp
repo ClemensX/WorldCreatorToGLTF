@@ -396,11 +396,11 @@ int main() {
 
     // Save it to a file
     tinygltf::TinyGLTF gltf;
-    gltf.WriteGltfSceneToFile(&model, "triangle.gltf",
+    gltf.WriteGltfSceneToFile(&model, "triangle.glb",
         true, // embedImages
-        false, // embedBuffers
-        true, // pretty print
-        false); // write binary
+        true, // embedBuffers
+        false, // pretty print
+        true); // write binary
 
     // writing glb complains with warninig:: URI is used in GLB container.
     //if (!gltf.WriteGltfSceneToFile(&model, "output.glb", true, true, true, true)) {
