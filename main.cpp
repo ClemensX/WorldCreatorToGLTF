@@ -241,10 +241,10 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
 
     // create buffer from the input data
     tinygltf::Buffer buffer;
-    size_t totalBufferLength = positions.size() * sizeof(float);// +indices.size();// +normals.size() * sizeof(float) + texcoords.size() * sizeof(float);
+    size_t totalBufferLength = positions.size() * sizeof(float) + indices.size();// +normals.size() * sizeof(float) + texcoords.size() * sizeof(float);
     buffer.data.resize(totalBufferLength);
     std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
-    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size());
+    std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size());
     //std::memcpy(buffer.data.data() + positions.size() * sizeof(float), normals.data(), normals.size() * sizeof(float));
     //std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + normals.size() * sizeof(float), texcoords.data(), texcoords.size() * sizeof(float));
     m.buffers.push_back(buffer);
@@ -387,7 +387,7 @@ int main() {
     tinygltf::TinyGLTF gltf;
     gltf.WriteGltfSceneToFile(&model, "triangle.gltf",
         true, // embedImages
-        true, // embedBuffers
+        false, // embedBuffers
         true, // pretty print
         false); // write binary
 
@@ -412,13 +412,15 @@ int main2(int argc, char* argv[]) {
     tinygltf::TinyGLTF loader;
     std::string err;
     std::string warn;
-    std::string input_filename("Cube.gltf");
+    //std::string input_filename("Cube.gltf");
+    std::string input_filename("C:/dev/cpp/data/raw/desert_Mesh_0_0.glb");
     std::string output_filename("Cube2.gltf");
     std::string embedded_filename =
         output_filename.substr(0, output_filename.size() - 5) + "-Embedded.gltf";
 
     // assume ascii glTF.
-    bool ret = loader.LoadASCIIFromFile(&modelOK, &err, &warn, input_filename.c_str());
+    //bool ret = loader.LoadASCIIFromFile(&modelOK, &err, &warn, input_filename.c_str());
+    bool ret = loader.LoadBinaryFromFile(&modelOK, &err, &warn, input_filename.c_str());
     if (!warn.empty()) {
         std::cout << "warn : " << warn << std::endl;
     }
@@ -432,7 +434,7 @@ int main2(int argc, char* argv[]) {
 
     // Embedd buffers and images
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
-    loader.WriteGltfSceneToFile(&modelOK, embedded_filename, true, true);
+    loader.WriteGltfSceneToFile(&modelOK, embedded_filename, true, false);
 #endif
     //main1();
     return EXIT_SUCCESS;
