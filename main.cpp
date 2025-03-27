@@ -147,6 +147,43 @@ bool ValidateTinyGltfModel(const tinygltf::Model& model) {
     return valid;
 }
 
+void extractIndexAttribute(const tinygltf::Model& model, const tinygltf::Primitive& primitive, std::vector<unsigned char>& outData, int& stride,
+    std::vector<double>& min, std::vector<double>& max,
+    tinygltf::Accessor& accessorOut, tinygltf::BufferView& bufferViewOut) {
+    auto& accessor = model.accessors[primitive.indices];
+    auto& bufferView = model.bufferViews[accessor.bufferView];
+    const unsigned char* bufferData = reinterpret_cast<const unsigned char*>(&(model.buffers[bufferView.buffer].data[accessor.byteOffset + bufferView.byteOffset]));
+    outData.assign(bufferData, bufferData + accessor.count * 4);
+    for (double minVal : accessor.minValues) {
+        min.push_back(minVal);
+    }
+    for (double maxVal : accessor.maxValues) {
+        max.push_back(maxVal);
+    }
+    bufferViewOut.target = bufferView.target;
+    accessorOut.componentType = accessor.componentType;
+    accessorOut.count = accessor.count;
+    accessorOut.type = accessor.type;
+}
+
+void extractVertexAttribute(const tinygltf::Model& model, const tinygltf::Primitive& primitive, const std::string& attributeName, std::vector<float>& outData, int& stride,
+    std::vector<double>& min, std::vector<double>& max) {
+    auto it = primitive.attributes.find(attributeName);
+    if (it != primitive.attributes.end()) {
+        const tinygltf::Accessor& accessor = model.accessors[it->second];
+        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
+        const float* bufferData = reinterpret_cast<const float*>(&(model.buffers[bufferView.buffer].data[accessor.byteOffset + bufferView.byteOffset]));
+        stride = accessor.ByteStride(bufferView) ? (accessor.ByteStride(bufferView) / sizeof(float)) : tinygltf::GetNumComponentsInType(accessor.type);
+        outData.assign(bufferData, bufferData + accessor.count * stride);
+        for (double minVal : accessor.minValues) {
+            min.push_back(minVal);
+        }
+        for (double maxVal : accessor.maxValues) {
+            max.push_back(maxVal);
+        }
+    }
+}
+
 void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     // Create a model with a single mesh and save it as a gltf file
     tinygltf::Scene scene;
@@ -156,8 +193,8 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     tinygltf::Asset asset;
 
     // define buffer data: positions, inices and text coords
-    std::vector<float> positions = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
-    std::vector<uint16_t> indices = { 0, 1, 2, 0, 1, 2 }; // doubled length for 4 byte multiple
+    //std::vector<float> positions = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+    //std::vector<uint16_t> indices = { 0, 1, 2, 0, 1, 2 }; // doubled length for 4 byte multiple
     //std::vector<float> positions = {
     //    // 36 bytes of floating point numbers
     //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -169,13 +206,47 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     //std::vector<uint16_t> indices = { 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00 };
     std::vector<float> texcoords = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 
+    auto& primMesh = modelMesh.meshes[0].primitives[0];
+    // Extract positions
+    std::vector<float> positions;
+    std::vector<double> posMin;
+    std::vector<double> posMax;
+    int posStrideMesh;
+    extractVertexAttribute(modelMesh, primMesh, "POSITION", positions, posStrideMesh, posMin, posMax);
+    Log(" copy mesh buffer positions: " << positions.size()/posStrideMesh << std::endl);
+    // Extract normals
+    std::vector<float> normals;
+    std::vector<double> normalMin;
+    std::vector<double> normalMax;
+    int normalStride;
+    extractVertexAttribute(modelMesh, primMesh, "NORMAL", normals, normalStride, normalMin, normalMax);
+    Log(" copy mesh buffer normals: " << normals.size() / normalStride << std::endl);
+    // Extract texture coordinates
+    std::vector<float> texCoords;
+    std::vector<double> texMin;
+    std::vector<double> texMax;
+    int texCoordStride;
+    extractVertexAttribute(modelMesh, primMesh, "TEXCOORD_0", texCoords, texCoordStride, texMin, texMax);
+    Log(" copy mesh buffer tex 0: " << texCoords.size() / texCoordStride << std::endl);
+
+    // indices
+    tinygltf::Accessor indicesAccessor;
+    tinygltf::BufferView indicesBufferView;
+    // Extract normals
+    std::vector<unsigned char> indices; // typeless buffer
+    std::vector<double> indicesMin;
+    std::vector<double> indicesMax;
+    int indicesStride;
+    extractIndexAttribute(modelMesh, primMesh, indices, indicesStride, indicesMin, indicesMax, indicesAccessor, indicesBufferView);
+
     // create buffer from the input data
     tinygltf::Buffer buffer;
-    size_t totalBufferLength = positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t) + texcoords.size() * sizeof(float);
+    size_t totalBufferLength = positions.size() * sizeof(float);// +indices.size();// +normals.size() * sizeof(float) + texcoords.size() * sizeof(float);
     buffer.data.resize(totalBufferLength);
     std::memcpy(buffer.data.data(), positions.data(), positions.size() * sizeof(float));
-    std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size() * sizeof(uint16_t));
-    std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t), texcoords.data(), texcoords.size() * sizeof(float));
+    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float), indices.data(), indices.size());
+    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float), normals.data(), normals.size() * sizeof(float));
+    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + normals.size() * sizeof(float), texcoords.data(), texcoords.size() * sizeof(float));
     m.buffers.push_back(buffer);
 
     // define the buffer views
@@ -186,19 +257,25 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     positionBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
     m.bufferViews.push_back(positionBufferView);
 
-    tinygltf::BufferView indexBufferView;
-    indexBufferView.buffer = 0;
-    indexBufferView.byteOffset = positions.size() * sizeof(float);
-    indexBufferView.byteLength = indices.size() * sizeof(uint16_t);
-    indexBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-    m.bufferViews.push_back(indexBufferView);
+    indicesBufferView.buffer = 0;
+    indicesBufferView.byteOffset = positions.size() * sizeof(float);
+    indicesBufferView.byteLength = indices.size();
+    //indicesBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER; set in extract method
+    //m.bufferViews.push_back(indicesBufferView);
+
+    tinygltf::BufferView normalBufferView;
+    normalBufferView.buffer = 0;
+    normalBufferView.byteOffset = positions.size() * sizeof(float);
+    normalBufferView.byteLength = normals.size() * sizeof(float);
+    normalBufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+    //m.bufferViews.push_back(normalBufferView);
 
     tinygltf::BufferView texcoordBufferView;
     texcoordBufferView.buffer = 0;
-    texcoordBufferView.byteOffset = positions.size() * sizeof(float) + indices.size() * sizeof(uint16_t);
+    texcoordBufferView.byteOffset = positions.size() * sizeof(float) + normals.size() * sizeof(float);
     texcoordBufferView.byteLength = texcoords.size() * sizeof(float);
     texcoordBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-    m.bufferViews.push_back(texcoordBufferView);
+    //m.bufferViews.push_back(texcoordBufferView);
 
     // define the accessors
 
@@ -208,18 +285,25 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     positionAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
     positionAccessor.count = static_cast<int>(positions.size() / 3);
     positionAccessor.type = TINYGLTF_TYPE_VEC3;
-    positionAccessor.maxValues = { 1.0, 1.0, 0.0 };
-    positionAccessor.minValues = { 0.0, 0.0, 0.0 };
+    positionAccessor.maxValues = posMax;
+    positionAccessor.minValues = posMin;
     m.accessors.push_back(positionAccessor);
 
-    tinygltf::Accessor indexAccessor;
-    indexAccessor.bufferView = 1;
-    indexAccessor.byteOffset = 0;
-    indexAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
-    indexAccessor.count = static_cast<int>(indices.size());
-    indexAccessor.count = static_cast<int>(3); // override
-    indexAccessor.type = TINYGLTF_TYPE_SCALAR;
-    m.accessors.push_back(indexAccessor);
+    indicesAccessor.bufferView = 1;
+    indicesAccessor.byteOffset = 0;
+    //indicesAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT; // set in extract method, also count and type
+    indicesAccessor.maxValues = indicesMax;
+    indicesAccessor.minValues = indicesMin;
+    //m.accessors.push_back(indicesAccessor);
+
+    tinygltf::Accessor normalAccessor;
+    normalAccessor.bufferView = 1;
+    normalAccessor.byteOffset = 0;
+    normalAccessor.componentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+    normalAccessor.count = static_cast<int>(normals.size() / 3);
+    normalAccessor.count = static_cast<int>(3); // override
+    normalAccessor.type = TINYGLTF_TYPE_SCALAR;
+    //m.accessors.push_back(normalAccessor);
 
     tinygltf::Accessor texcoordAccessor;
     texcoordAccessor.bufferView = 2;
@@ -227,12 +311,13 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     texcoordAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
     texcoordAccessor.count = static_cast<int>(texcoords.size() / 2);
     texcoordAccessor.type = TINYGLTF_TYPE_VEC2;
-    m.accessors.push_back(texcoordAccessor);
+    //m.accessors.push_back(texcoordAccessor);
 
     // Build the mesh primitive and add it to the mesh
     primitive.attributes["POSITION"] = 0;
-    primitive.indices = 1;
-    primitive.attributes["TEXCOORD_0"] = 2;
+    //primitive.indices = 1;
+    //primitive.attributes["NORMAL"] = 1;
+    //primitive.attributes["TEXCOORD_0"] = 2;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
     primitive.material = 0;
     mesh.primitives.push_back(primitive);
@@ -291,7 +376,7 @@ int main() {
         "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
-    AddTexturesToMaterial(model, mapFiles);
+    //AddTexturesToMaterial(model, mapFiles);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
