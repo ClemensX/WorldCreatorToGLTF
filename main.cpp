@@ -204,7 +204,7 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     //    0x00,0x00,0x00,0x00 };
     //// 6 bytes of indices and two bytes of padding
     //std::vector<uint16_t> indices = { 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00 };
-    std::vector<float> texcoords = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+    //std::vector<float> texcoords = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 
     auto& primMesh = modelMesh.meshes[0].primitives[0];
     // Extract positions
@@ -246,13 +246,13 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     ps = positions.size() * sizeof(float);
     is = indices.size(); // we handle this as bytes
     ns = normals.size() * sizeof(float);
-    ts = texcoords.size() * sizeof(float);
-    size_t totalBufferLength = ps + is + ns;// +ts;
+    ts = texCoords.size() * sizeof(float);
+    size_t totalBufferLength = ps + is + ns + ts;
     buffer.data.resize(totalBufferLength);
     std::memcpy(buffer.data.data(), positions.data(), ps);
     std::memcpy(buffer.data.data() + ps, indices.data(), is);
     std::memcpy(buffer.data.data() + ps + is, normals.data(), ns);
-    //std::memcpy(buffer.data.data() + positions.size() * sizeof(float) + normals.size() * sizeof(float), texcoords.data(), texcoords.size() * sizeof(float));
+    std::memcpy(buffer.data.data() + ps + is + ns, texCoords.data(), ts);
     m.buffers.push_back(buffer);
 
     // define the buffer views
@@ -278,10 +278,10 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
 
     tinygltf::BufferView texcoordBufferView;
     texcoordBufferView.buffer = 0;
-    texcoordBufferView.byteOffset = positions.size() * sizeof(float) + normals.size() * sizeof(float);
-    texcoordBufferView.byteLength = texcoords.size() * sizeof(float);
+    texcoordBufferView.byteOffset = ps + is + ns;
+    texcoordBufferView.byteLength = ts;
     texcoordBufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
-    //m.bufferViews.push_back(texcoordBufferView);
+    m.bufferViews.push_back(texcoordBufferView);
 
     // define the accessors
 
@@ -315,18 +315,20 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     m.accessors.push_back(normalAccessor);
 
     tinygltf::Accessor texcoordAccessor;
-    texcoordAccessor.bufferView = 2;
+    texcoordAccessor.bufferView = 3;
     texcoordAccessor.byteOffset = 0;
     texcoordAccessor.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
-    texcoordAccessor.count = static_cast<int>(texcoords.size() / 2);
+    texcoordAccessor.count = static_cast<int>(texCoords.size() / 2);
     texcoordAccessor.type = TINYGLTF_TYPE_VEC2;
-    //m.accessors.push_back(texcoordAccessor);
+    texcoordAccessor.maxValues = texMax;
+    texcoordAccessor.minValues = texMin;
+    m.accessors.push_back(texcoordAccessor);
 
     // Build the mesh primitive and add it to the mesh
     primitive.attributes["POSITION"] = 0;
     primitive.indices = 1;
     primitive.attributes["NORMAL"] = 2;
-    //primitive.attributes["TEXCOORD_0"] = 3;
+    primitive.attributes["TEXCOORD_0"] = 3;
     primitive.mode = TINYGLTF_MODE_TRIANGLES;
     primitive.material = 0;
     mesh.primitives.push_back(primitive);
@@ -385,7 +387,7 @@ int main() {
         "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
     };
 
-    //AddTexturesToMaterial(model, mapFiles);
+    AddTexturesToMaterial(model, mapFiles);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
