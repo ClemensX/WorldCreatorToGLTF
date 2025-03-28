@@ -28,6 +28,35 @@ Export all these files into the same folder:
 
 ![wc_scene_1](images/wc1.png)
 
+### 2 Run Converter
+
+Your input folder should looks like this:
+![input folder](images/input.png)
+Put the binary somewhere on your machine and run it like this (Sorry, we only provide the Windows binary):
+
+```
+./WorldCreatorToGLTF.exe Terrain "C:\wcexport"
+```
+
+Be sure to add quotation marks if your path contains space characters. Like so:
+```
+./WorldCreatorToGLTF.exe Terrain "C:\Users\cleme\OneDrive\Dokumente\World Creator\Export"
+```
+If all goes well you will see a message like this: ``Exported successfully to "C:\\wcexport\\Terrain.glb"``
+Now use the binary glb file anywhere you like!
+
+Usage in Khronos gltf viewer:
+![input folder](images/sampleviewer.png)
+
+Usage in Blender:
+![input folder](images/blender.png)
+
+Usage in gltf PBR Viewer by Sascha Willems (https://www.saschawillems.de)
+![input folder](images/willems.png)
+
+Usage in our own engine (https://www.shadedpath.org)
+![input folder](images/sp.png)
+
 ## Development
 This section is only important to you if you want to build the tool yourself. Maybe you want to debug it while running or you want to make modifications. If you only want to run the tool please see instructions above.
 

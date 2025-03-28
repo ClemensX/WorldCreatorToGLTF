@@ -64,26 +64,22 @@ unsigned char* WritePngToBuffer(int width, int height, int channels, const unsig
 unsigned char* LoadTextureData(const std::string& filePath, int& width, int& height, int& channels) {
     unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
     if (!data) {
-        Log("Failed to load texture: " << filePath << std::endl);
+        Error("Failed to load texture: " << filePath << std::endl);
     }
     return data;
 }
 
 void handleImage(tinygltf::Model& model, tinygltf::Image& image, unsigned char* data) {
-    //image.image.resize(width * height * channels);
-    //std::copy(data, data + width * height * channels, image.image.begin());
-    //stbi_image_free(data);
 
     // write png format to intermediate buffer
     int out_len;
     unsigned char* png_buffer = WritePngToBuffer(image.width, image.height, image.component, data, out_len);
 
-    // Create a tinygltf::Buffer and tinygltf::BufferView for the image
+    // copy png data to global buffer and create tinygltf::BufferView for the image
     tinygltf::Buffer &buffer = model.buffers[0];
     size_t imageDataSize = out_len; //image.width * image.height * image.component;
     size_t bufferDataSize = buffer.data.size();
     buffer.data.resize( bufferDataSize + imageDataSize);
-    //std::copy(data, data + imageDataSize, buffer.data.begin() + bufferDataSize);
     std::copy(png_buffer, png_buffer + imageDataSize, buffer.data.begin() + bufferDataSize);
     stbi_image_free(data);
     stbi_image_free(png_buffer);
@@ -121,7 +117,6 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
 
     // do not set uri, as we are embedding the image
     //image.uri = filePath;
-    //image.bufferView = -1;
 
     // Add the image to the model
     model.images.push_back(image);
@@ -168,7 +163,7 @@ void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
-    // now add merged met/rough texture:
+    // now add merged metallic/rough texture:
     tinygltf::Texture texture = CreateTinyGltfTexture(model, metallicRoughnessImage, data);
     pbr.roughnessFactor = 1.0;
     pbr.metallicRoughnessTexture.index = static_cast<int>(model.textures.size() - 1);
@@ -234,8 +229,6 @@ void MergeRoughnessIntoMetalness(const std::vector<std::string>& mapFiles, tinyg
     metallicRoughnessImage.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
     metallicRoughnessImage.image.resize(width * height * 4);
     *data_ptr_addr = metallicRoughnessData;
-    //std::copy(metallicRoughnessData, metallicRoughnessData + width * height * 4, metallicRoughnessImage.image.begin());
-    //stbi_image_free(metallicRoughnessData);
 }
 
 
@@ -309,20 +302,6 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     tinygltf::Primitive primitive;
     tinygltf::Node node;
     tinygltf::Asset asset;
-
-    // define buffer data: positions, inices and text coords
-    //std::vector<float> positions = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
-    //std::vector<uint16_t> indices = { 0, 1, 2, 0, 1, 2 }; // doubled length for 4 byte multiple
-    //std::vector<float> positions = {
-    //    // 36 bytes of floating point numbers
-    //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    //    0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
-    //    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    //    0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
-    //    0x00,0x00,0x00,0x00 };
-    //// 6 bytes of indices and two bytes of padding
-    //std::vector<uint16_t> indices = { 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00 };
-    //std::vector<float> texcoords = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 
     auto& primMesh = modelMesh.meshes[0].primitives[0];
     // Extract positions
@@ -568,51 +547,7 @@ int main(int argc, char* argv[]) {
         false, // pretty print
         true); // write binary
 
-    // writing glb complains with warninig:: URI is used in GLB container.
-    //if (!gltf.WriteGltfSceneToFile(&model, "output.glb", true, true, true, true)) {
-    //    Log("Failed to write glTF file" << std::endl);
-    //    return -1;
-    //}
-
     Log("Exported successfully to " << outputPath << std::endl);
 
     return 0;
-}
-
-int main2(int argc, char* argv[]) {
-    //if (argc != 3) {
-    //    std::cout << "Needs input.gltf output.gltf" << std::endl;
-    //    return EXIT_FAILURE;
-    //}
-
-    tinygltf::Model modelOK;
-    tinygltf::TinyGLTF loader;
-    std::string err;
-    std::string warn;
-    //std::string input_filename("Cube.gltf");
-    std::string input_filename("C:/dev/cpp/data/raw/desert_Mesh_0_0.glb");
-    std::string output_filename("Cube2.gltf");
-    std::string embedded_filename =
-        output_filename.substr(0, output_filename.size() - 5) + "-Embedded.gltf";
-
-    // assume ascii glTF.
-    //bool ret = loader.LoadASCIIFromFile(&modelOK, &err, &warn, input_filename.c_str());
-    bool ret = loader.LoadBinaryFromFile(&modelOK, &err, &warn, input_filename.c_str());
-    if (!warn.empty()) {
-        std::cout << "warn : " << warn << std::endl;
-    }
-    if (!ret) {
-        if (!err.empty()) {
-            std::cerr << err << std::endl;
-        }
-        return EXIT_FAILURE;
-    }
-    //loader.WriteGltfSceneToFile(&model, output_filename);
-
-    // Embedd buffers and images
-#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
-    loader.WriteGltfSceneToFile(&modelOK, embedded_filename, true, false);
-#endif
-    //main1();
-    return EXIT_SUCCESS;
 }
