@@ -18,7 +18,7 @@ elseif(APPLE)
 endif()
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Check if VCPKG_ROOT is defined

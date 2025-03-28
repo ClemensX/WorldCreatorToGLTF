@@ -19,6 +19,7 @@
     std::wstring wstr(str.begin(), str.end()); \
     std::wstringstream wss(wstr); \
     OutputDebugString(wss.str().c_str()); \
+    std::cout << str << std::endl; \
 }
 #elif defined(__APPLE__)
 #define Log(x)\
@@ -90,7 +91,10 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     //// Set the buffer view for the image
     //image.bufferView = static_cast<int>(model.bufferViews.size() - 1);
     //image.mimeType = "image/png"; // Set the appropriate MIME type
-    image.uri = filePath;
+
+    // do not set uri, as we are embedding the image
+    //image.uri = filePath;
+    image.bufferView = -1;
 
     // Add the image to the model
     model.images.push_back(image);
@@ -126,12 +130,14 @@ void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string
     tinygltf::PbrMetallicRoughness& pbr = material.pbrMetallicRoughness;
 
     for (const auto& filePath : mapFiles) {
-        tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
         if (filePath.find("Color") != std::string::npos) {
+            tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
             pbr.baseColorTexture.index = static_cast<int>(model.textures.size() - 1);
         } else if (filePath.find("Normal") != std::string::npos) {
+            tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
             material.normalTexture.index = static_cast<int>(model.textures.size() - 1);
         } else if (filePath.find("AmbientOcclusion") != std::string::npos) {
+            tinygltf::Texture texture = CreateTinyGltfTexture(model, filePath);
             material.occlusionTexture.index = static_cast<int>(model.textures.size() - 1);
         }
     }
@@ -439,7 +445,58 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
     m.materials.push_back(mat);
 }
 
-int main() {
+void usage() {
+    Log("Usage: WorldCreatorToGLTF <BaseName> <InputFolder> [<OutputFolder>]" << std::endl);
+    Log("  typical use: WorldCreatorToGLTF Terrain c:/export " << std::endl);
+    Log("    will produce Terrain.glb in folder c:/export " << std::endl);
+}
+
+void setup(const std::string baseName, const std::string inputFolder, const std::string outputFolder, std::vector<std::string>& texFiles, std::string& meshFile) {
+    if (!std::filesystem::exists(inputFolder)) {
+        Error("Input folder does not exist: " << inputFolder << std::endl);
+    }
+    if (!std::filesystem::exists(outputFolder)) {
+        Error("Output folder does not exist: " << outputFolder << std::endl);
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(inputFolder)) {
+        if (entry.is_regular_file()) {
+            const std::string fileName = entry.path().filename().string();
+            if (fileName.find(baseName) != std::string::npos && fileName.find(".png") != std::string::npos) {
+                texFiles.push_back(entry.path().string());
+                Log("Found texture file: " << fileName << std::endl);
+            }
+        }
+    }
+    if (texFiles.size() == 0) {
+        Error("No texture files found in input folder for base name " << baseName << std::endl);
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(inputFolder)) {
+        if (entry.is_regular_file()) {
+            const std::string fileName = entry.path().filename().string();
+            if (fileName.find(baseName) != std::string::npos && fileName.find("Mesh") != std::string::npos) {
+                meshFile = entry.path().string();
+                Log("Found mesh file: " << fileName << std::endl);
+            }
+        }
+    }
+    if (meshFile.empty()) {
+        Error("No mesh file found in input folder for base name " << baseName << std::endl);
+    }
+}
+
+int main(int argc, char* argv[]) {
+    Log(argv[0] << std::endl);
+    if (argc != 4 && argc != 3) {
+        usage();
+        exit(1);
+    }
+
+    std::vector<std::string> texFiles;
+    std::string meshFile;
+    std::string baseName = argv[1];
+    std::string inputFolder = argv[2];
+    std::string outputFolder = argc == 4 ? argv[3] : inputFolder;
+    setup(baseName, inputFolder, outputFolder, texFiles, meshFile);
 
     tinygltf::Model modelMesh;
     tinygltf::Model model;
@@ -447,9 +504,8 @@ int main() {
         tinygltf::TinyGLTF loader;
         std::string err;
         std::string warn;
-        std::string input_filename("C:/dev/cpp/data/raw/desert_Mesh_0_0.glb");
         // assume ascii glTF.
-        bool ret = loader.LoadBinaryFromFile(&modelMesh, &err, &warn, input_filename.c_str());
+        bool ret = loader.LoadBinaryFromFile(&modelMesh, &err, &warn, meshFile.c_str());
         if (!warn.empty()) {
             std::cout << "warn : " << warn << std::endl;
         }
@@ -462,27 +518,22 @@ int main() {
         Log("Loaded mesh model" << std::endl);
     }
     createModel(model, modelMesh);
-    std::vector<std::string> mapFiles = {
-        //"Cube_BaseColor.png"//,
-        "C:/dev/cpp/data/raw/desert_Colormap_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Normal Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Roughness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_Metalness Map_0_0.png",
-        "C:/dev/cpp/data/raw/desert_AmbientOcclusionMap_0_0.png"
-    };
     tinygltf::Image metallicRoughnessImage; // partly filled, not put to gltf model
-    MergeRoughnessIntoMetalness(mapFiles, metallicRoughnessImage);
+    MergeRoughnessIntoMetalness(texFiles, metallicRoughnessImage);
 
-    AddTexturesToMaterial(model, mapFiles, metallicRoughnessImage);
+    AddTexturesToMaterial(model, texFiles, metallicRoughnessImage);
 
     //if (!ValidateTinyGltfModel(model)) {
     //    Log("Model validation failed" << std::endl);
     //    return -1;
     //}
 
+    // Construct the output file path
+    std::string nameWithType = baseName + ".glb";
+    std::filesystem::path outputPath = std::filesystem::path(outputFolder) / nameWithType;
     // Save it to a file
     tinygltf::TinyGLTF gltf;
-    gltf.WriteGltfSceneToFile(&model, "triangle.glb",
+    gltf.WriteGltfSceneToFile(&model, outputPath.string(),
         true, // embedImages
         true, // embedBuffers
         false, // pretty print
@@ -494,7 +545,7 @@ int main() {
     //    return -1;
     //}
 
-    Log("Exported successfully" << std::endl);
+    Log("Exported successfully to " << outputPath << std::endl);
 
     return 0;
 }
