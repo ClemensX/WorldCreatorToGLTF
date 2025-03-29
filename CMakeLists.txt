@@ -38,7 +38,6 @@ endif()
 include(${CMAKE_TOOLCHAIN_FILE})
 
 # Find packages using vcpkg
-find_package(assimp CONFIG REQUIRED)
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 message(INFO "TINYGLTF_INCLUDE_DIRS ${TINYGLTF_INCLUDE_DIRS}")
 
@@ -46,7 +45,7 @@ message(INFO "TINYGLTF_INCLUDE_DIRS ${TINYGLTF_INCLUDE_DIRS}")
 add_executable(WorldCreatorToGLTF main.cpp)
 
 # Link libraries
-target_link_libraries(WorldCreatorToGLTF PRIVATE assimp::assimp)
+target_link_libraries(WorldCreatorToGLTF PRIVATE)
 
 # Include directories
-target_include_directories(WorldCreatorToGLTF PRIVATE ${ASSIMP_INCLUDE_DIRS} ${TINYGLTF_INCLUDE_DIRS})
+target_include_directories(WorldCreatorToGLTF PRIVATE ${TINYGLTF_INCLUDE_DIRS})

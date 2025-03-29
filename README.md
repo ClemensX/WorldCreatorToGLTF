@@ -30,8 +30,10 @@ Export all these files into the same folder:
 
 ### 2 Run Converter
 
-Your input folder should looks like this:
+Your input folder should look like this:
+
 ![input folder](images/input.png)
+
 Put the binary somewhere on your machine and run it like this (Sorry, we only provide the Windows binary):
 
 ```
@@ -67,10 +69,9 @@ This section is only important to you if you want to build the tool yourself. Ma
 
 ### Dependencies
 This project uses the following libraries:
-- Assimp
 - tinygltf
 
-Install with ``vcpkg install assimp tinygltf``
+Install with ``vcpkg install tinygltf``
 
 ### Setup Instructions
 

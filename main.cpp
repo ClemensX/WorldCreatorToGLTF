@@ -6,8 +6,6 @@
 #include <vector>
 #include <array>
 
-#if defined(DEBUG) | defined(_DEBUG)
-#define LogCond(y,x) if(y){Log(x)}
 #if defined(_WIN64)
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
@@ -32,10 +30,6 @@
 {\
     std::stringstream s1765; s1765 << x; \
 }
-#endif
-#else
-#define Log(x)
-#define LogCond(y,x)
 #endif
 
 #define Error(x)\
@@ -69,6 +63,7 @@ unsigned char* LoadTextureData(const std::string& filePath, int& width, int& hei
     return data;
 }
 
+// copy image data to global buffer and create BufferView for an image
 void handleImage(tinygltf::Model& model, tinygltf::Image& image, unsigned char* data) {
 
     // write png format to intermediate buffer
@@ -98,7 +93,7 @@ void handleImage(tinygltf::Model& model, tinygltf::Image& image, unsigned char* 
     image.mimeType = "image/png"; // Set the appropriate MIME type
 }
 
-// Function to create a tinygltf texture from loaded texture data
+// Function to create a tinygltf texture by loading from file
 tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::string& filePath) {
     int width, height, channels;
     unsigned char* data = LoadTextureData(filePath, width, height, channels);
@@ -129,7 +124,7 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, const std::strin
     return texture;
 }
 
-// Function to create a tinygltf texture from loaded Image
+// Function to create a tinygltf texture by using in-memory data
 tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, tinygltf::Image& metallicRoughnessImage, unsigned char* data) {
 
     handleImage(model, metallicRoughnessImage, data);
@@ -145,7 +140,7 @@ tinygltf::Texture CreateTinyGltfTexture(tinygltf::Model& model, tinygltf::Image&
     return texture;
 }
 
-// Function to add textures to tinygltf material
+// Function to add PBR textures to tinygltf material
 void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string>& mapFiles, tinygltf::Image& metallicRoughnessImage, unsigned char* data) {
     assert(model.materials.size() == 1);
     tinygltf::Material& material = model.materials[0];
@@ -170,9 +165,10 @@ void AddTexturesToMaterial(tinygltf::Model& model, const std::vector<std::string
 }
 
 // Function to merge roughness and metalness maps into a single metallicRoughness map
-// we assume that each map has the same value in all channels, so we just copy the gree channel from the roughness map
-// into the green channel of the metallness map. Red and alpha are all set to 255
-void MergeRoughnessIntoMetalness(const std::vector<std::string>& mapFiles, tinygltf::Image& metallicRoughnessImage, unsigned char** data_ptr_addr) {
+// we get grayscale info from each map and copy from the roughness map into the green channel of the combined map,
+// and from the metalness map into the blue channel of the combined map.
+// Red and alpha are all set to 255
+void MergeRoughnessAndMetalness(const std::vector<std::string>& mapFiles, tinygltf::Image& metallicRoughnessImage, unsigned char** data_ptr_addr) {
     std::string metalnessPath;
     std::string roughnessPath;
 
@@ -295,8 +291,8 @@ void extractVertexAttribute(const tinygltf::Model& model, const tinygltf::Primit
     }
 }
 
+// create model from data of the exported WorldCreator mesh
 void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
-    // Create a model with a single mesh and save it as a gltf file
     tinygltf::Scene scene;
     tinygltf::Mesh mesh;
     tinygltf::Primitive primitive;
@@ -447,8 +443,8 @@ void createModel(tinygltf::Model& m, tinygltf::Model& modelMesh) {
 
     // Create a simple material
     tinygltf::Material mat;
-    mat.pbrMetallicRoughness.baseColorFactor = { 1.0f, 0.9f, 0.9f, 1.0f };
-    mat.doubleSided = true;
+    mat.pbrMetallicRoughness.baseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
+    //mat.doubleSided = true; may need to be set for off cases
     m.materials.push_back(mat);
 }
 
@@ -527,7 +523,7 @@ int main(int argc, char* argv[]) {
     createModel(model, modelMesh);
     tinygltf::Image metallicRoughnessImage; // partly filled, not put to gltf model
     unsigned char* metallicRoughnessData = nullptr;
-    MergeRoughnessIntoMetalness(texFiles, metallicRoughnessImage, &metallicRoughnessData);
+    MergeRoughnessAndMetalness(texFiles, metallicRoughnessImage, &metallicRoughnessData);
 
     AddTexturesToMaterial(model, texFiles, metallicRoughnessImage, metallicRoughnessData);
 
