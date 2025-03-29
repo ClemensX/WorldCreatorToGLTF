@@ -34,7 +34,7 @@ Your input folder should look like this:
 
 ![input folder](images/input.png)
 
-Put the binary somewhere on your machine and run it like this (Sorry, we only provide the Windows binary):
+Put the binary somewhere on your machine and run it like this (Sorry, we only provide the Windows binary): https://github.com/ClemensX/WorldCreatorToGLTF/releases
 
 ```
 ./WorldCreatorToGLTF.exe Terrain "C:\wcexport"
